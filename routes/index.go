@@ -6,9 +6,6 @@ import (
 	"github.com/deathstarset/books-api/sql"
 )
 
-func createApiConfig() handlers.ApiConfig {
-	apiConfig := handlers.ApiConfig{
-		Queries: database.New(sql.ConnectDb()),
-	}
-	return apiConfig
+var apiConfig = handlers.ApiConfig{
+	Queries: database.New(sql.ConnectDb()),
 }

@@ -9,7 +9,6 @@ import (
 func RespondWithError(w http.ResponseWriter, statusCode int, errorString string) {
 	if statusCode >= 499 {
 		log.Printf("Internal server error : %v", errorString)
-		return
 	}
 	type errorResponse struct {
 		Error string `json:"error"`
