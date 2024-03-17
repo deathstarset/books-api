@@ -50,3 +50,54 @@ func (q *Queries) CreateBook(ctx context.Context, arg CreateBookParams) (Book, e
 	)
 	return i, err
 }
+
+const deleteBook = `-- name: DeleteBook :exec
+DELETE FROM books 
+WHERE id = $1 AND user_id = $2
+`
+
+type DeleteBookParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) DeleteBook(ctx context.Context, arg DeleteBookParams) error {
+	_, err := q.db.ExecContext(ctx, deleteBook, arg.ID, arg.UserID)
+	return err
+}
+
+const getAllBooks = `-- name: GetAllBooks :many
+SELECT id, created_at, updated_at, title, description, image_link, user_id FROM books 
+ORDER BY created_at DESC
+`
+
+func (q *Queries) GetAllBooks(ctx context.Context) ([]Book, error) {
+	rows, err := q.db.QueryContext(ctx, getAllBooks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Book
+	for rows.Next() {
+		var i Book
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Description,
+			&i.ImageLink,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

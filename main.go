@@ -37,6 +37,7 @@ func main() {
 		w.Write([]byte("Health is good"))
 	})
 	mainRouter.Mount("/api/v1", routes.UsersRouter(client))
+	mainRouter.Mount("/api/v1/books", routes.BooksRouter(client))
 
 	portString := os.Getenv("PORT")
 	if portString == "" {
