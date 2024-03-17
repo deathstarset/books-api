@@ -12,10 +12,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	_ "github.com/lib/pq"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
 	godotenv.Load(".env")
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
 
 	mainRouter := chi.NewRouter()
 	mainRouter.Use(middleware.Logger)
@@ -30,7 +36,7 @@ func main() {
 	mainRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Health is good"))
 	})
-	mainRouter.Mount("/api/v1", routes.UsersRouter())
+	mainRouter.Mount("/api/v1", routes.UsersRouter(client))
 
 	portString := os.Getenv("PORT")
 	if portString == "" {
