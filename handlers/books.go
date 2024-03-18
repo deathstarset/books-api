@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -12,17 +13,17 @@ import (
 	"github.com/google/uuid"
 )
 
-func (apiCfg *ApiConfig) CreateBookHandler(w http.ResponseWriter, r *http.Request, user database.User) {
+func CreateBookHandler(w http.ResponseWriter, r *http.Request, user database.User, queries *database.Queries) {
 
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
-		responses.RespondWithError(w, http.StatusInternalServerError, "Failed to parse multiform data")
+		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to read multipart form data : %v", err))
 		return
 	}
 
 	file, handler, err := r.FormFile("image_link")
 	if err != nil {
-		responses.RespondWithError(w, http.StatusInternalServerError, "Failed to read the file")
+		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to read file : %v", err))
 		return
 	}
 	defer file.Close()
@@ -35,7 +36,7 @@ func (apiCfg *ApiConfig) CreateBookHandler(w http.ResponseWriter, r *http.Reques
 
 	title := r.FormValue("title")
 	description := r.FormValue("description")
-	book, err := apiCfg.Queries.CreateBook(r.Context(), database.CreateBookParams{
+	book, err := queries.CreateBook(r.Context(), database.CreateBookParams{
 		ID:          uuid.New(),
 		CreatedAt:   time.Now().Local(),
 		UpdatedAt:   time.Now().Local(),
@@ -52,14 +53,14 @@ func (apiCfg *ApiConfig) CreateBookHandler(w http.ResponseWriter, r *http.Reques
 	responses.RespondWithJSON(w, http.StatusCreated, mappings.DbBookToBookMapping(book))
 }
 
-func (apiCfg *ApiConfig) DeleteBookHandler(w http.ResponseWriter, r *http.Request, user database.User) {
+func DeleteBookHandler(w http.ResponseWriter, r *http.Request, user database.User, queries *database.Queries) {
 	bookIDstr := chi.URLParam(r, "bookID")
 	bookID, err := uuid.Parse(bookIDstr)
 	if err != nil {
 		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to parse book id : %v", err))
 		return
 	}
-	err = apiCfg.Queries.DeleteBook(r.Context(), database.DeleteBookParams{
+	err = queries.DeleteBook(r.Context(), database.DeleteBookParams{
 		ID:     bookID,
 		UserID: user.ID,
 	})
@@ -73,8 +74,8 @@ func (apiCfg *ApiConfig) DeleteBookHandler(w http.ResponseWriter, r *http.Reques
 	responses.RespondWithJSON(w, http.StatusAccepted, deleteResponse{Message: "book deleted succefully"})
 }
 
-func (apiCfg *ApiConfig) GetAllBooksHandler(w http.ResponseWriter, r *http.Request) {
-	DbBooks, err := apiCfg.Queries.GetAllBooks(r.Context())
+func GetAllBooksHandler(w http.ResponseWriter, r *http.Request, queries *database.Queries) {
+	DbBooks, err := queries.GetAllBooks(r.Context())
 	if err != nil {
 		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to get books : %v", err))
 	}
@@ -85,4 +86,50 @@ func (apiCfg *ApiConfig) GetAllBooksHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	responses.RespondWithJSON(w, http.StatusOK, books)
+}
+
+func UpdateBookHandler(w http.ResponseWriter, r *http.Request, user database.User, queries *database.Queries) {
+	bookIDstr := chi.URLParam(r, "bookID")
+	bookID, err := uuid.Parse(bookIDstr)
+	if err != nil {
+		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to parse uuid : %v", err))
+		return
+	}
+	book, err := queries.GetBookByUserAndID(r.Context(), database.GetBookByUserAndIDParams{
+		ID:     bookID,
+		UserID: user.ID,
+	})
+	if err != nil {
+		responses.RespondWithJSON(w, http.StatusNotFound, fmt.Sprintf("Book not found : %v", err))
+		return
+	}
+	type parameters struct {
+		Title       string `json:"title"`
+		Description string `json:"description"`
+	}
+	params := parameters{}
+	decoder := json.NewDecoder(r.Body)
+	decoder.Decode(&params)
+	if params.Description == "" {
+		params.Description = book.Description
+	}
+	if params.Title == "" {
+		params.Title = book.Title
+	}
+	err = queries.UpdateBook(r.Context(), database.UpdateBookParams{
+		Title:       params.Title,
+		Description: params.Description,
+		UpdatedAt:   time.Now().Local(),
+		ID:          bookID,
+		UserID:      user.ID,
+	})
+	if err != nil {
+		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to update book : %v", err))
+		return
+	}
+
+	type updateBookResponse struct {
+		Message string `json:"message"`
+	}
+	responses.RespondWithJSON(w, http.StatusAccepted, updateBookResponse{Message: "Book updated succefully"})
 }

@@ -101,3 +101,53 @@ func (q *Queries) GetAllBooks(ctx context.Context) ([]Book, error) {
 	}
 	return items, nil
 }
+
+const getBookByUserAndID = `-- name: GetBookByUserAndID :one
+SELECT id, created_at, updated_at, title, description, image_link, user_id FROM books
+WHERE id = $1 AND user_id = $2
+`
+
+type GetBookByUserAndIDParams struct {
+	ID     uuid.UUID
+	UserID uuid.UUID
+}
+
+func (q *Queries) GetBookByUserAndID(ctx context.Context, arg GetBookByUserAndIDParams) (Book, error) {
+	row := q.db.QueryRowContext(ctx, getBookByUserAndID, arg.ID, arg.UserID)
+	var i Book
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Description,
+		&i.ImageLink,
+		&i.UserID,
+	)
+	return i, err
+}
+
+const updateBook = `-- name: UpdateBook :exec
+UPDATE books 
+SET updated_at = $1, title = $2, description = $3
+WHERE id = $4 AND user_id = $5
+`
+
+type UpdateBookParams struct {
+	UpdatedAt   time.Time
+	Title       string
+	Description string
+	ID          uuid.UUID
+	UserID      uuid.UUID
+}
+
+func (q *Queries) UpdateBook(ctx context.Context, arg UpdateBookParams) error {
+	_, err := q.db.ExecContext(ctx, updateBook,
+		arg.UpdatedAt,
+		arg.Title,
+		arg.Description,
+		arg.ID,
+		arg.UserID,
+	)
+	return err
+}

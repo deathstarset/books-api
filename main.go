@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/deathstarset/books-api/internal/database"
 	"github.com/deathstarset/books-api/routes"
+	"github.com/deathstarset/books-api/sql"
 	"github.com/joho/godotenv"
 
 	"github.com/go-chi/chi/v5"
@@ -17,11 +19,19 @@ import (
 
 func main() {
 	godotenv.Load(".env")
+	// connect to redis
 	client := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: os.Getenv("REDIS_PASSWORD"),
 		DB:       0,
 	})
+
+	// connect to postgres
+	db := sql.ConnectDb()
+	defer db.Close()
+
+	// get the database queries
+	DBqueries := database.New(db)
 
 	mainRouter := chi.NewRouter()
 	mainRouter.Use(middleware.Logger)
@@ -36,8 +46,8 @@ func main() {
 	mainRouter.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Health is good"))
 	})
-	mainRouter.Mount("/api/v1", routes.UsersRouter(client))
-	mainRouter.Mount("/api/v1/books", routes.BooksRouter(client))
+	mainRouter.Mount("/api/v1", routes.UsersRouter(client, DBqueries))
+	mainRouter.Mount("/api/v1/books", routes.BooksRouter(client, DBqueries))
 
 	portString := os.Getenv("PORT")
 	if portString == "" {
@@ -49,4 +59,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start server : %v", err)
 	}
+
 }

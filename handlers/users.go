@@ -16,7 +16,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func (apiCfg *ApiConfig) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
+func CreateUserHandler(w http.ResponseWriter, r *http.Request, queries *database.Queries) {
 	// parse the multi-part data
 	err := r.ParseMultipartForm(32 << 20)
 	if err != nil {
@@ -46,7 +46,7 @@ func (apiCfg *ApiConfig) CreateUserHandler(w http.ResponseWriter, r *http.Reques
 		responses.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Internal server error : %v", err))
 	}
 
-	user, err := apiCfg.Queries.CreateUser(r.Context(), database.CreateUserParams{
+	user, err := queries.CreateUser(r.Context(), database.CreateUserParams{
 		ID:        uuid.New(),
 		CreatedAt: time.Now().Local(),
 		UpdatedAt: time.Now().Local(),
@@ -62,7 +62,7 @@ func (apiCfg *ApiConfig) CreateUserHandler(w http.ResponseWriter, r *http.Reques
 	responses.RespondWithJSON(w, http.StatusCreated, mappings.DbUserToUserMapping(user))
 }
 
-func (apiCfg *ApiConfig) LoginHandler(client *redis.Client) http.HandlerFunc {
+func LoginHandler(client *redis.Client, queries *database.Queries) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		type parameters struct {
 			Username string `json:"username"`
@@ -71,7 +71,7 @@ func (apiCfg *ApiConfig) LoginHandler(client *redis.Client) http.HandlerFunc {
 		decoder := json.NewDecoder(r.Body)
 		params := parameters{}
 		decoder.Decode(&params)
-		user, err := apiCfg.Queries.GetUserByUsername(r.Context(), params.Username)
+		user, err := queries.GetUserByUsername(r.Context(), params.Username)
 		if err != nil {
 			responses.RespondWithError(w, http.StatusNotFound, fmt.Sprintf("Failed to get user : %v", err))
 			return
@@ -106,7 +106,7 @@ func (apiCfg *ApiConfig) LoginHandler(client *redis.Client) http.HandlerFunc {
 	}
 }
 
-func (apiCfg *ApiConfig) LogoutHandler(client *redis.Client) http.HandlerFunc {
+func LogoutHandler(client *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session_token, err := r.Cookie("session_token")
 		if err != nil {
